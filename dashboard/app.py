@@ -99,7 +99,7 @@ def _compute_total_pnl(positions: list[dict], logs: list[dict]) -> dict:
 @app.get("/", response_class=HTMLResponse)
 async def root():
     html_path = os.path.join(DASHBOARD_DIR, "index.html")
-    with open(html_path) as f:
+    with open(html_path, encoding="utf-8") as f:
         return f.read()
 
 

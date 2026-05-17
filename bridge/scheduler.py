@@ -28,7 +28,7 @@ from bridge.portfolio_manager import (
 from bridge.market_scanner import scan
 from bridge.trade_logger import (
     log_cycle_start, log_cycle_end, log_analysis,
-    log_trade, log_error, log_stop_loss,
+    log_trade, log_error, log_stop_loss, log_agent_state,
 )
 
 CYCLE_INTERVAL_HOURS = 1
@@ -80,6 +80,12 @@ def run_trading_cycle(tickers: list[str] | None = None):
             action = decision.get("action", "hold").lower()
             reasoning = decision.get("reasoning", "")
             conviction = _map_conviction(decision)
+
+            # Log full multi-agent pipeline state for dashboard
+            try:
+                log_agent_state(ticker, _state)
+            except Exception:
+                pass
 
             print(f"[AGENT] Decision: {action.upper()} {ticker} | {reasoning[:120]}")
             log_analysis(ticker, action, conviction, reasoning)

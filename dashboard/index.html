@@ -6,172 +6,468 @@
   <title>xStocks Trading Agent — Milan AI Week</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background: #0a0e1a; font-family: 'Courier New', monospace; }
-    .card { background: #0f1629; border: 1px solid #1e3a5f; }
-    .glow-green { box-shadow: 0 0 12px rgba(0,255,128,0.15); }
-    .glow-red   { box-shadow: 0 0 12px rgba(255,60,60,0.15); }
-    .badge-live  { background:#0d3320; color:#00ff80; border:1px solid #00ff80; }
-    .badge-paper { background:#2a1a00; color:#ffaa00; border:1px solid #ffaa00; }
-    .badge-hold  { background:#1a1a2e; color:#8888aa; border:1px solid #444466; }
-    .badge-buy   { background:#0d3320; color:#00ff80; border:1px solid #00ff80; }
-    .badge-sell  { background:#3d0f0f; color:#ff4444; border:1px solid #ff4444; }
-    .log-entry { border-left: 2px solid #1e3a5f; }
-    .log-trade  { border-left-color: #00ff80; }
-    .log-sell   { border-left-color: #ff4444; }
-    .log-error  { border-left-color: #ff6600; }
-    .log-scan   { border-left-color: #0088ff; }
-    .log-analysis { border-left-color: #aa44ff; }
-    .log-stop_loss { border-left-color: #ff6600; }
-    .pulse { animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #0a0e1a; }
-    ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 2px; }
-    .ticker-row:hover { background: #141c30; }
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #f0f4f8; }
+
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .card-header { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; margin-bottom: 12px; }
+
+    /* Agent node styles */
+    .agent-node { border-radius: 10px; border: 1.5px solid; padding: 10px 12px; transition: all 0.3s; }
+    .agent-node.pending  { background: #f8fafc; border-color: #cbd5e1; opacity: 0.6; }
+    .agent-node.running  { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .agent-node.complete { background: white; border-color: #94a3b8; }
+    .agent-node.complete.positive { border-color: #22c55e; background: #f0fdf4; }
+    .agent-node.complete.negative { border-color: #ef4444; background: #fef2f2; }
+    .agent-node.complete.neutral  { border-color: #94a3b8; background: #f8fafc; }
+
+    .agent-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .icon-market  { background: #dbeafe; }
+    .icon-social  { background: #f3e8ff; }
+    .icon-news    { background: #fef3c7; }
+    .icon-fund    { background: #dcfce7; }
+    .icon-bull    { background: #dcfce7; }
+    .icon-bear    { background: #fee2e2; }
+    .icon-trader  { background: #e0e7ff; }
+    .icon-agg     { background: #fee2e2; }
+    .icon-neutral { background: #f1f5f9; }
+    .icon-cons    { background: #dbeafe; }
+    .icon-manager { background: #fef9c3; }
+    .icon-exec    { background: #dcfce7; }
+
+    /* Arrow connector */
+    .arrow { display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 18px; padding: 0 4px; }
+
+    /* Status badges */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-live   { background: #dcfce7; color: #15803d; }
+    .badge-paper  { background: #fef9c3; color: #92400e; }
+    .badge-buy    { background: #dcfce7; color: #15803d; }
+    .badge-sell   { background: #fee2e2; color: #b91c1c; }
+    .badge-hold   { background: #f1f5f9; color: #475569; }
+    .badge-running{ background: #dbeafe; color: #1d4ed8; }
+    .badge-idle   { background: #f1f5f9; color: #64748b; }
+
+    .dot-live { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+    .dot-idle { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.9)} }
+
+    .pnl-pos { color: #16a34a; }
+    .pnl-neg { color: #dc2626; }
+    .pnl-neu { color: #64748b; }
+
+    /* Section divider arrow between pipeline stages */
+    .stage-arrow { display: flex; align-items: center; color: #94a3b8; padding: 0 2px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #94a3b8; text-align: center; margin-bottom: 6px; }
+
+    .report-text { font-size: 11px; color: #64748b; line-height: 1.5; max-height: 70px; overflow-y: auto; }
+    .report-text.expanded { max-height: none; }
+
+    .ticker-tag { display: inline-block; background: #1e40af; color: white; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+
+    tr:hover td { background: #f8fafc; }
   </style>
 </head>
-<body class="text-gray-200 min-h-screen p-4">
+<body class="min-h-screen">
 
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-2xl font-bold text-white tracking-wider">
-        ⚡ xStocks Trading Agent
-      </h1>
-      <p class="text-xs text-gray-500 mt-1">Milan AI Week Hackathon · Powered by Gemini 2.5 + Kraken CLI</p>
-    </div>
+  <!-- ── Top Nav ─────────────────────────────────────────────────────────── -->
+  <nav class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
     <div class="flex items-center gap-3">
-      <span id="mode-badge" class="badge-paper text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">PAPER</span>
-      <div class="flex items-center gap-2">
-        <div id="status-dot" class="w-3 h-3 rounded-full bg-gray-600"></div>
-        <span id="status-text" class="text-sm text-gray-400">Connecting...</span>
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">⚡</div>
+      <div>
+        <div class="font-bold text-slate-800 text-sm leading-tight">xStocks Trading Agent</div>
+        <div class="text-xs text-slate-400">Milan AI Week Hackathon · Gemini 2.5 + Kraken CLI</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-1.5">
+        <div id="status-dot" class="dot-idle"></div>
+        <span id="status-text" class="text-sm text-slate-500 font-medium">Connecting…</span>
+      </div>
+      <span id="mode-badge" class="badge badge-paper">📝 PAPER</span>
+      <div class="text-right">
+        <div class="text-xs text-slate-400">Balance</div>
+        <div id="nav-balance" class="text-sm font-bold text-slate-700">—</div>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-slate-400">Total PnL</div>
+        <div id="nav-pnl" class="text-sm font-bold text-slate-400">—</div>
+      </div>
+      <div class="text-xs text-slate-300" id="last-updated">—</div>
+    </div>
+  </nav>
+
+  <div class="max-w-screen-2xl mx-auto p-4 space-y-4">
+
+    <!-- ── KPI Row ─────────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 font-medium mb-1">USD Balance</div>
+        <div id="kpi-balance" class="text-2xl font-bold text-slate-800">—</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 font-medium mb-1">Total PnL</div>
+        <div id="kpi-total-pnl" class="text-2xl font-bold text-slate-400">—</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 font-medium mb-1">Unrealized</div>
+        <div id="kpi-unrealized" class="text-2xl font-bold text-slate-400">—</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 font-medium mb-1">Open Positions</div>
+        <div id="kpi-positions" class="text-2xl font-bold text-slate-800">—</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 font-medium mb-1">Trades Today</div>
+        <div id="kpi-trades" class="text-2xl font-bold text-slate-800">—</div>
+      </div>
+    </div>
+
+    <!-- ── Agent Pipeline ──────────────────────────────────────────────── -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="card-header mb-0">🧠 Multi-Agent Pipeline</div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Analyzing:</span>
+          <span id="pipeline-ticker" class="ticker-tag">—</span>
+          <span id="pipeline-cycle-time" class="text-xs text-slate-400 ml-2">—</span>
+        </div>
+      </div>
+
+      <!-- Pipeline flow: horizontal scroll on small screens -->
+      <div class="overflow-x-auto">
+        <div class="flex items-start gap-1 min-w-max">
+
+          <!-- Stage 1: Data Sources -->
+          <div class="w-36">
+            <div class="section-label">Data Sources</div>
+            <div class="space-y-1.5">
+              <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
+                <span>📈</span><span class="text-slate-500 font-medium">Yahoo Finance</span>
+              </div>
+              <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
+                <span>🐦</span><span class="text-slate-500 font-medium">X / Reddit</span>
+              </div>
+              <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
+                <span>📰</span><span class="text-slate-500 font-medium">FinHub / Reuters</span>
+              </div>
+              <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
+                <span>🏢</span><span class="text-slate-500 font-medium">Financials DB</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-10">→</div>
+
+          <!-- Stage 2: Analysts -->
+          <div class="w-52">
+            <div class="section-label">Analyst Team</div>
+            <div class="space-y-1.5">
+              <div id="node-market" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-market">📊</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Market Analyst</div>
+                    <div class="text-xs text-slate-400">RSI · MACD · Bollinger</div>
+                  </div>
+                </div>
+                <div id="report-market" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-sentiment" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-social">💬</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Social Analyst</div>
+                    <div class="text-xs text-slate-400">Sentiment · Buzz</div>
+                  </div>
+                </div>
+                <div id="report-sentiment" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-news" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-news">📰</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">News Analyst</div>
+                    <div class="text-xs text-slate-400">Headlines · Events</div>
+                  </div>
+                </div>
+                <div id="report-news" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-fundamentals" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-fund">📋</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Fundamentals</div>
+                    <div class="text-xs text-slate-400">P/E · EPS · Revenue</div>
+                  </div>
+                </div>
+                <div id="report-fundamentals" class="report-text">Waiting…</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-20">→</div>
+
+          <!-- Stage 3: Researcher Team (Bull vs Bear) -->
+          <div class="w-52">
+            <div class="section-label">Researcher Team</div>
+            <div class="space-y-1.5">
+              <div id="node-bull" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-bull">🐂</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Bull Researcher</div>
+                    <div class="text-xs text-slate-400">Buy evidence</div>
+                  </div>
+                </div>
+                <div id="report-bull" class="report-text">Waiting…</div>
+              </div>
+              <div class="text-xs text-center text-slate-400 py-0.5 font-medium">⚡ Debate</div>
+              <div id="node-bear" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-bear">🐻</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Bear Researcher</div>
+                    <div class="text-xs text-slate-400">Sell evidence</div>
+                  </div>
+                </div>
+                <div id="report-bear" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-invest-plan" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-social">⚖️</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Investment Plan</div>
+                    <div class="text-xs text-slate-400">Judge decision</div>
+                  </div>
+                </div>
+                <div id="report-invest-plan" class="report-text">Waiting…</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-20">→</div>
+
+          <!-- Stage 4: Trader -->
+          <div class="w-48">
+            <div class="section-label">Trader</div>
+            <div id="node-trader" class="agent-node pending">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="agent-icon icon-trader">💼</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-700">Trader Agent</div>
+                  <div class="text-xs text-slate-400">Transaction proposal</div>
+                </div>
+              </div>
+              <div id="report-trader" class="report-text">Waiting for researchers…</div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-10">→</div>
+
+          <!-- Stage 5: Risk Management -->
+          <div class="w-52">
+            <div class="section-label">Risk Management</div>
+            <div class="space-y-1.5">
+              <div id="node-risk-agg" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-agg">🔴</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Aggressive</div>
+                    <div class="text-xs text-slate-400">Max return focus</div>
+                  </div>
+                </div>
+                <div id="report-risk-agg" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-risk-neu" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-neutral">⚪</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Neutral</div>
+                    <div class="text-xs text-slate-400">Balanced approach</div>
+                  </div>
+                </div>
+                <div id="report-risk-neu" class="report-text">Waiting…</div>
+              </div>
+              <div id="node-risk-con" class="agent-node pending">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="agent-icon icon-cons">🔵</div>
+                  <div>
+                    <div class="text-xs font-semibold text-slate-700">Conservative</div>
+                    <div class="text-xs text-slate-400">Capital protection</div>
+                  </div>
+                </div>
+                <div id="report-risk-con" class="report-text">Waiting…</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-14">→</div>
+
+          <!-- Stage 6: Manager + Decision -->
+          <div class="w-44">
+            <div class="section-label">Manager</div>
+            <div id="node-manager" class="agent-node pending mb-2">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="agent-icon icon-manager">🎯</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-700">Portfolio Manager</div>
+                  <div class="text-xs text-slate-400">Final authority</div>
+                </div>
+              </div>
+              <div id="report-manager" class="report-text">Awaiting risk team…</div>
+            </div>
+            <!-- Final decision badge -->
+            <div id="final-decision-card" class="rounded-xl border-2 border-slate-200 bg-slate-50 p-3 text-center">
+              <div class="text-xs text-slate-400 mb-1">Decision</div>
+              <div id="final-action" class="text-xl font-bold text-slate-300">—</div>
+              <div id="final-ticker-display" class="text-xs text-slate-400 mt-0.5">—</div>
+            </div>
+          </div>
+
+          <div class="stage-arrow mt-10">→</div>
+
+          <!-- Stage 7: Execution -->
+          <div class="w-40">
+            <div class="section-label">Execution</div>
+            <div id="node-execution" class="agent-node pending">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="agent-icon icon-exec">⚡</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-700">Kraken CLI</div>
+                  <div class="text-xs text-slate-400">xStocks order</div>
+                </div>
+              </div>
+              <div id="report-execution" class="text-xs text-slate-400 font-mono">Standby…</div>
+              <div id="exec-status" class="mt-1"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Bottom grid: positions + chart + trades + logs ─────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Left: Open Positions + PnL Chart -->
+      <div class="lg:col-span-2 space-y-4">
+
+        <!-- Open Positions -->
+        <div class="card p-4">
+          <div class="card-header">Open Positions</div>
+          <table class="w-full">
+            <thead>
+              <tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th class="text-left pb-2 font-medium">Ticker</th>
+                <th class="text-right pb-2 font-medium">Qty</th>
+                <th class="text-right pb-2 font-medium">Entry</th>
+                <th class="text-right pb-2 font-medium">Current</th>
+                <th class="text-right pb-2 font-medium">PnL</th>
+                <th class="text-right pb-2 font-medium">PnL %</th>
+                <th class="text-right pb-2 font-medium">Entry Time</th>
+              </tr>
+            </thead>
+            <tbody id="positions-tbody" class="text-sm divide-y divide-slate-50">
+              <tr><td colspan="7" class="py-6 text-center text-slate-400 text-xs">No open positions</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PnL Chart -->
+        <div class="card p-4">
+          <div class="card-header">PnL Over Time</div>
+          <div style="height:140px">
+            <canvas id="pnl-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="card p-4">
+          <div class="card-header">Trade History</div>
+          <div id="trades-list" class="space-y-1.5 max-h-60 overflow-y-auto">
+            <div class="text-xs text-slate-400 text-center py-4">No trades yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Agent status + live log -->
+      <div class="space-y-4">
+
+        <!-- Agent info -->
+        <div class="card p-4">
+          <div class="card-header">Agent Status</div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center py-1 border-b border-slate-50">
+              <span class="text-slate-500">Status</span>
+              <span id="info-status" class="font-medium text-slate-700">—</span>
+            </div>
+            <div class="flex justify-between items-center py-1 border-b border-slate-50">
+              <span class="text-slate-500">Mode</span>
+              <span id="info-mode" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between items-center py-1 border-b border-slate-50">
+              <span class="text-slate-500">Last Cycle</span>
+              <span id="info-last" class="font-medium text-slate-600 text-xs">—</span>
+            </div>
+            <div class="flex justify-between items-center py-1 border-b border-slate-50">
+              <span class="text-slate-500">Next Cycle</span>
+              <span id="info-next" class="font-medium text-slate-600 text-xs">—</span>
+            </div>
+            <div class="flex justify-between items-center py-1">
+              <span class="text-slate-500">Interval</span>
+              <span class="font-medium text-blue-600">Every 1 hour</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live activity log -->
+        <div class="card p-4 flex-1">
+          <div class="flex items-center justify-between mb-3">
+            <div class="card-header mb-0">Live Activity</div>
+            <div id="live-indicator" class="flex items-center gap-1.5 text-xs text-slate-400">
+              <div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+              Standby
+            </div>
+          </div>
+          <div id="log-feed" class="space-y-1 max-h-96 overflow-y-auto text-xs">
+            <div class="text-slate-400 text-center py-4">Waiting for agent activity…</div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 
-  <!-- Top stats row -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-    <div class="card rounded-xl p-4">
-      <div class="text-xs text-gray-500 uppercase tracking-widest mb-1">USD Balance</div>
-      <div id="stat-balance" class="text-2xl font-bold text-white">—</div>
-    </div>
-    <div class="card rounded-xl p-4">
-      <div class="text-xs text-gray-500 uppercase tracking-widest mb-1">Total PnL</div>
-      <div id="stat-total-pnl" class="text-2xl font-bold text-gray-400">—</div>
-    </div>
-    <div class="card rounded-xl p-4">
-      <div class="text-xs text-gray-500 uppercase tracking-widest mb-1">Unrealized</div>
-      <div id="stat-unrealized" class="text-2xl font-bold text-gray-400">—</div>
-    </div>
-    <div class="card rounded-xl p-4">
-      <div class="text-xs text-gray-500 uppercase tracking-widest mb-1">Open Positions</div>
-      <div id="stat-positions" class="text-2xl font-bold text-white">—</div>
-    </div>
-  </div>
-
-  <!-- Main grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-    <!-- Left col: positions + trades -->
-    <div class="lg:col-span-2 flex flex-col gap-4">
-
-      <!-- Open Positions -->
-      <div class="card rounded-xl p-4">
-        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-3">Open Positions</h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-xs text-gray-500 border-b border-gray-800">
-              <th class="text-left pb-2">Ticker</th>
-              <th class="text-right pb-2">Qty</th>
-              <th class="text-right pb-2">Entry</th>
-              <th class="text-right pb-2">Current</th>
-              <th class="text-right pb-2">PnL</th>
-              <th class="text-right pb-2">PnL %</th>
-            </tr>
-          </thead>
-          <tbody id="positions-tbody">
-            <tr><td colspan="6" class="py-6 text-center text-gray-600 text-xs">No open positions</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- PnL Chart -->
-      <div class="card rounded-xl p-4">
-        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-3">PnL History</h2>
-        <div style="height:160px;">
-          <canvas id="pnl-chart"></canvas>
-        </div>
-      </div>
-
-      <!-- Recent Trades -->
-      <div class="card rounded-xl p-4">
-        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-3">Recent Trades</h2>
-        <div id="trades-list" class="space-y-2 max-h-64 overflow-y-auto">
-          <div class="text-xs text-gray-600 text-center py-4">No trades yet</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right col: agent activity -->
-    <div class="flex flex-col gap-4">
-
-      <!-- Agent Status -->
-      <div class="card rounded-xl p-4">
-        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-3">Agent Status</h2>
-        <div id="agent-status-panel" class="space-y-2 text-xs text-gray-400">
-          <div class="flex justify-between"><span>Status</span><span id="a-status" class="text-gray-500">—</span></div>
-          <div class="flex justify-between"><span>Mode</span><span id="a-mode" class="text-gray-500">—</span></div>
-          <div class="flex justify-between"><span>Last Cycle</span><span id="a-last-cycle" class="text-gray-500">—</span></div>
-          <div class="flex justify-between"><span>Next Cycle</span><span id="a-next-cycle" class="text-gray-500">—</span></div>
-          <div class="flex justify-between"><span>Cycle Interval</span><span class="text-blue-400">Every 1 hour</span></div>
-        </div>
-      </div>
-
-      <!-- Last Gemini Decision -->
-      <div class="card rounded-xl p-4">
-        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-3">Latest Gemini Decision</h2>
-        <div id="last-decision">
-          <div class="text-xs text-gray-600 text-center py-4">Awaiting first analysis...</div>
-        </div>
-      </div>
-
-      <!-- Live Log Feed -->
-      <div class="card rounded-xl p-4 flex-1">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest">Live Feed</h2>
-          <div id="live-dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
-        </div>
-        <div id="log-feed" class="space-y-1 max-h-80 overflow-y-auto text-xs font-mono">
-          <div class="text-gray-600 text-center py-4">Waiting for agent activity...</div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-4 text-center text-xs text-gray-700">
-    Auto-refreshes every 5s · <span id="last-updated">—</span>
-  </div>
+  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+  <footer class="text-center text-xs text-slate-400 py-4">
+    Milan AI Week Hackathon · TradingAgents + Kraken CLI + Gemini 2.5 · Auto-refresh 5s
+  </footer>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────────
-const pnlHistory = { labels: [], data: [] };
-let pnlChart;
+// ── Chart ─────────────────────────────────────────────────────────────────────
+const pnlData = { labels: [], data: [] };
+let chart;
 
-// ── Chart setup ────────────────────────────────────────────────────────────────
 function initChart() {
-  const ctx = document.getElementById('pnl-chart').getContext('2d');
-  pnlChart = new Chart(ctx, {
+  chart = new Chart(document.getElementById('pnl-chart').getContext('2d'), {
     type: 'line',
     data: {
-      labels: pnlHistory.labels,
+      labels: pnlData.labels,
       datasets: [{
-        label: 'Total PnL ($)',
-        data: pnlHistory.data,
-        borderColor: '#00ff80',
-        backgroundColor: 'rgba(0,255,128,0.05)',
+        label: 'PnL ($)',
+        data: pnlData.data,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.07)',
         borderWidth: 2,
         pointRadius: 2,
         fill: true,
@@ -179,242 +475,282 @@ function initChart() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#4a5568', font: { size: 9 } }, grid: { color: '#111827' } },
-        y: { ticks: { color: '#4a5568', font: { size: 9 },
-               callback: v => '$' + v.toFixed(2) },
-             grid: { color: '#111827' } }
+        x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+        y: { ticks: { color: '#94a3b8', font: { size: 9 }, callback: v => '$' + v.toFixed(2) },
+             grid: { color: '#f1f5f9' } }
       }
     }
   });
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function fmt$( v ) { return v == null ? '—' : (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2); }
-function fmtPct(v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt$ = v => v == null ? '—' : (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+const fmtPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+const pnlCls = v => v > 0 ? 'pnl-pos' : v < 0 ? 'pnl-neg' : 'pnl-neu';
 function fmtTime(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleTimeString();
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
-function pnlColor(v) { return v > 0 ? 'text-green-400' : v < 0 ? 'text-red-400' : 'text-gray-400'; }
-
-function logTypeLabel(type) {
-  const map = {
-    cycle_start: '🔄 CYCLE START',
-    cycle_end:   '✅ CYCLE DONE',
-    scan:        '📡 SCANNER',
-    analysis:    '🧠 GEMINI',
-    trade:       '💱 TRADE',
-    stop_loss:   '🛑 STOP LOSS',
-    error:       '❌ ERROR',
-  };
-  return map[type] || type.toUpperCase();
+function trim(s, n = 160) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
-function logLineClass(type, entry) {
-  if (type === 'trade' && entry.action === 'sell') return 'log-entry log-sell pl-3 py-1 rounded';
-  if (type === 'trade') return 'log-entry log-trade pl-3 py-1 rounded';
-  if (type === 'error') return 'log-entry log-error pl-3 py-1 rounded';
-  if (type === 'scan')  return 'log-entry log-scan pl-3 py-1 rounded';
-  if (type === 'analysis') return 'log-entry log-analysis pl-3 py-1 rounded';
-  if (type === 'stop_loss') return 'log-entry log-stop_loss pl-3 py-1 rounded';
-  return 'log-entry pl-3 py-1 rounded';
+// ── Pipeline node updater ─────────────────────────────────────────────────────
+function setNode(id, state, text, cls = '') {
+  const node = document.getElementById('node-' + id);
+  const report = document.getElementById('report-' + id);
+  if (!node) return;
+  node.className = 'agent-node ' + state + (cls ? ' ' + cls : '');
+  if (report && text) report.textContent = trim(text);
 }
 
-function logLineText(e) {
-  if (e.type === 'trade') {
-    const sign = e.action === 'buy' ? '▲' : '▼';
-    return `${sign} ${e.action.toUpperCase()} ${e.quantity} ${e.ticker} @ $${(e.price||0).toFixed(2)} · ${e.status}`;
+function renderPipeline(p) {
+  if (!p || !p.cycle_ts) return;
+
+  const ticker = p.ticker || '—';
+  document.getElementById('pipeline-ticker').textContent = ticker;
+  document.getElementById('pipeline-cycle-time').textContent = fmtTime(p.cycle_ts);
+
+  // Analysts
+  if (p.agent_market)       setNode('market',       'complete', p.agent_market.report);
+  if (p.agent_sentiment)    setNode('sentiment',     'complete', p.agent_sentiment.report);
+  if (p.agent_news)         setNode('news',          'complete', p.agent_news.report);
+  if (p.agent_fundamentals) setNode('fundamentals',  'complete', p.agent_fundamentals.report);
+
+  // Researchers
+  if (p.agent_bull) {
+    const bullText = p.agent_bull.argument || '';
+    const isBullish = p.agent_bull.judge && p.agent_bull.judge.toLowerCase().includes('bull');
+    setNode('bull', 'complete', bullText, isBullish ? 'positive' : '');
   }
-  if (e.type === 'analysis') {
-    return `${e.ticker} → ${e.action.toUpperCase()} [${e.conviction}]`;
+  if (p.agent_bear) {
+    setNode('bear', 'complete', p.agent_bear.argument || '');
   }
-  if (e.type === 'scan') {
-    return `Top: ${(e.top||[]).join(', ')}`;
+  if (p.agent_investment_plan) {
+    setNode('invest-plan', 'complete', p.agent_investment_plan.plan || '');
   }
-  if (e.type === 'stop_loss') {
-    return `${e.ticker} stop-loss hit @ ${(e.pnl_pct*100).toFixed(1)}%`;
+
+  // Trader
+  if (p.agent_trader) {
+    setNode('trader', 'complete', p.agent_trader.plan || '');
   }
-  if (e.type === 'error') {
-    return `${e.context}: ${e.error}`;
+
+  // Risk
+  if (p.agent_risk_aggressive)  setNode('risk-agg', 'complete', p.agent_risk_aggressive.argument || '');
+  if (p.agent_risk_neutral)     setNode('risk-neu', 'complete', p.agent_risk_neutral.argument || '');
+  if (p.agent_risk_conservative)setNode('risk-con', 'complete', p.agent_risk_conservative.argument || '');
+
+  // Manager + Final
+  if (p.agent_final) {
+    setNode('manager', 'complete', p.agent_final.decision || '');
+
+    const analysis = p.analysis;
+    if (analysis) {
+      const action = (analysis.action || 'hold').toUpperCase();
+      const actionEl = document.getElementById('final-action');
+      const cardEl   = document.getElementById('final-decision-card');
+      actionEl.textContent = action;
+      document.getElementById('final-ticker-display').textContent = ticker;
+
+      if (action === 'BUY') {
+        actionEl.className = 'text-xl font-bold text-green-600';
+        cardEl.className = 'rounded-xl border-2 border-green-300 bg-green-50 p-3 text-center';
+      } else if (action === 'SELL') {
+        actionEl.className = 'text-xl font-bold text-red-600';
+        cardEl.className = 'rounded-xl border-2 border-red-300 bg-red-50 p-3 text-center';
+      } else {
+        actionEl.className = 'text-xl font-bold text-slate-400';
+        cardEl.className = 'rounded-xl border-2 border-slate-200 bg-slate-50 p-3 text-center';
+      }
+    }
   }
-  if (e.type === 'cycle_start') {
-    return `Analyzing: ${(e.tickers||[]).join(', ')}`;
+
+  // Execution
+  if (p.trade) {
+    const t = p.trade;
+    const isExec = t.status === 'executed';
+    setNode('execution', 'complete', '', isExec ? 'positive' : 'negative');
+    document.getElementById('report-execution').textContent =
+      `${t.action?.toUpperCase()} ${t.quantity} ${t.ticker} @ $${(t.price||0).toFixed(2)}`;
+    document.getElementById('exec-status').innerHTML =
+      `<span class="badge ${isExec ? 'badge-buy' : 'badge-hold'}">${isExec ? '✓ Executed' : '⚠ ' + t.status}</span>`;
   }
-  return '';
 }
 
-// ── Render functions ───────────────────────────────────────────────────────────
+// ── Status ─────────────────────────────────────────────────────────────────────
 function renderStatus(s) {
-  const dot = document.getElementById('status-dot');
-  const txt = document.getElementById('status-text');
-  const modeBadge = document.getElementById('mode-badge');
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-text');
+  const badge= document.getElementById('mode-badge');
+  const live = document.getElementById('live-indicator');
 
   if (s.running) {
-    dot.className = 'w-3 h-3 rounded-full bg-green-400 pulse';
-    txt.textContent = 'Agent running';
-    txt.className = 'text-sm text-green-400';
+    dot.className = 'dot-live';
+    txt.textContent = 'Running'; txt.className = 'text-sm font-medium text-green-600';
+    live.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-green-500" style="animation:pulse 2s infinite"></div> Live';
+    live.className = 'flex items-center gap-1.5 text-xs text-green-600';
   } else {
-    dot.className = 'w-3 h-3 rounded-full bg-yellow-500';
-    txt.textContent = 'Agent idle';
-    txt.className = 'text-sm text-yellow-400';
+    dot.className = 'dot-idle';
+    txt.textContent = 'Idle'; txt.className = 'text-sm font-medium text-slate-500';
+    live.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div> Standby';
+    live.className = 'flex items-center gap-1.5 text-xs text-slate-400';
   }
 
-  if (s.paper_mode) {
-    modeBadge.className = 'badge-paper text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest';
-    modeBadge.textContent = 'PAPER';
-  } else {
-    modeBadge.className = 'badge-live text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest';
-    modeBadge.textContent = 'LIVE';
-  }
+  badge.textContent = s.paper_mode ? '📝 PAPER' : '💰 LIVE';
+  badge.className = 'badge ' + (s.paper_mode ? 'badge-paper' : 'badge-live');
 
-  document.getElementById('a-status').textContent = s.running ? '🟢 Running' : '🟡 Idle';
-  document.getElementById('a-mode').textContent = s.paper_mode ? '📝 Paper' : '💰 Live';
-  document.getElementById('a-last-cycle').textContent = fmtTime(s.last_cycle);
+  document.getElementById('info-status').textContent = s.running ? '🟢 Running' : '🟡 Idle';
+  document.getElementById('info-mode').innerHTML = s.paper_mode
+    ? '<span class="text-amber-600 font-medium">📝 Paper Trading</span>'
+    : '<span class="text-green-600 font-medium">💰 Live Trading</span>';
+  document.getElementById('info-last').textContent = fmtTime(s.last_cycle);
   if (s.last_cycle) {
     const next = new Date(new Date(s.last_cycle).getTime() + 3600000);
-    document.getElementById('a-next-cycle').textContent = next.toLocaleTimeString();
+    document.getElementById('info-next').textContent = next.toLocaleTimeString();
   }
 }
 
+// ── Balance ────────────────────────────────────────────────────────────────────
 function renderBalance(bal) {
-  const usd = bal?.USD || bal?.balance?.USD || bal?.result?.ZUSD;
-  document.getElementById('stat-balance').textContent = usd ? '$' + parseFloat(usd).toFixed(2) : '—';
+  const usd = parseFloat(bal?.USD || bal?.balance?.USD || bal?.result?.ZUSD || 0);
+  const s = usd ? '$' + usd.toFixed(2) : '—';
+  document.getElementById('kpi-balance').textContent = s;
+  document.getElementById('nav-balance').textContent = s;
 }
 
+// ── Positions ──────────────────────────────────────────────────────────────────
 function renderPositions(positions) {
-  document.getElementById('stat-positions').textContent = positions.length + ' / 5';
+  document.getElementById('kpi-positions').textContent = positions.length + ' / 5';
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-gray-600 text-xs">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-400 text-xs">No open positions</td></tr>';
     return;
   }
   tbody.innerHTML = positions.map(p => {
-    const pnlCls = pnlColor(p.pnl_pct);
-    return `
-    <tr class="ticker-row border-b border-gray-900 text-sm">
-      <td class="py-2 font-bold text-white">${p.ticker}</td>
-      <td class="py-2 text-right text-gray-300">${p.quantity}</td>
-      <td class="py-2 text-right text-gray-400">$${(p.entry_price||0).toFixed(2)}</td>
-      <td class="py-2 text-right text-gray-300">${p.current_price ? '$'+p.current_price.toFixed(2) : '—'}</td>
-      <td class="py-2 text-right ${pnlColor(p.unrealized_pnl)}">${fmt$(p.unrealized_pnl)}</td>
-      <td class="py-2 text-right ${pnlCls}">${fmtPct(p.pnl_pct)}</td>
+    const cls = pnlCls(p.pnl_pct);
+    return `<tr class="text-sm">
+      <td class="py-2 pr-2"><span class="ticker-tag text-xs">${p.ticker}</span></td>
+      <td class="py-2 text-right text-slate-600">${p.quantity}</td>
+      <td class="py-2 text-right text-slate-500">$${(p.entry_price||0).toFixed(2)}</td>
+      <td class="py-2 text-right text-slate-700 font-medium">${p.current_price ? '$'+p.current_price.toFixed(2) : '—'}</td>
+      <td class="py-2 text-right font-medium ${cls}">${fmt$(p.unrealized_pnl)}</td>
+      <td class="py-2 text-right font-semibold ${cls}">${fmtPct(p.pnl_pct)}</td>
+      <td class="py-2 text-right text-slate-400 text-xs">${fmtTime(p.entry_time)}</td>
     </tr>`;
   }).join('');
 }
 
+// ── PnL ────────────────────────────────────────────────────────────────────────
 function renderPnl(pnl) {
   const total = pnl?.total ?? null;
-  const unrealized = pnl?.unrealized ?? null;
+  const unr   = pnl?.unrealized ?? null;
 
-  const totalEl = document.getElementById('stat-total-pnl');
+  const totalEl = document.getElementById('kpi-total-pnl');
   totalEl.textContent = fmt$(total);
-  totalEl.className = 'text-2xl font-bold ' + pnlColor(total);
+  totalEl.className = 'text-2xl font-bold ' + pnlCls(total).replace('pnl-pos','text-green-600').replace('pnl-neg','text-red-600').replace('pnl-neu','text-slate-400');
 
-  const unrEl = document.getElementById('stat-unrealized');
-  unrEl.textContent = fmt$(unrealized);
-  unrEl.className = 'text-2xl font-bold ' + pnlColor(unrealized);
+  const unrEl = document.getElementById('kpi-unrealized');
+  unrEl.textContent = fmt$(unr);
+  unrEl.className = 'text-2xl font-bold ' + pnlCls(unr).replace('pnl-pos','text-green-600').replace('pnl-neg','text-red-600').replace('pnl-neu','text-slate-400');
 
-  // Update chart
-  const now = new Date().toLocaleTimeString();
-  pnlHistory.labels.push(now);
-  pnlHistory.data.push(total ?? 0);
-  if (pnlHistory.labels.length > 40) {
-    pnlHistory.labels.shift();
-    pnlHistory.data.shift();
-  }
-  if (pnlChart) pnlChart.update();
+  document.getElementById('nav-pnl').textContent = fmt$(total);
+  document.getElementById('nav-pnl').className = 'text-sm font-bold ' + (total > 0 ? 'text-green-600' : total < 0 ? 'text-red-500' : 'text-slate-400');
+
+  pnlData.labels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  pnlData.data.push(total ?? 0);
+  if (pnlData.labels.length > 50) { pnlData.labels.shift(); pnlData.data.shift(); }
+  if (chart) chart.update();
 }
 
+// ── Trades ─────────────────────────────────────────────────────────────────────
 function renderTrades(trades) {
+  document.getElementById('kpi-trades').textContent = trades.length;
   const el = document.getElementById('trades-list');
   if (!trades.length) {
-    el.innerHTML = '<div class="text-xs text-gray-600 text-center py-4">No trades yet</div>';
+    el.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">No trades yet</div>';
     return;
   }
-  el.innerHTML = trades.slice(0, 15).map(t => {
+  el.innerHTML = trades.slice(0, 20).map(t => {
     const isBuy = t.action === 'buy';
-    const icon = isBuy ? '▲' : '▼';
-    const color = isBuy ? 'text-green-400' : 'text-red-400';
-    const statusColor = t.status === 'executed' ? 'text-gray-400' : 'text-orange-400';
-    return `
-    <div class="flex items-center justify-between py-1.5 border-b border-gray-900 text-xs">
+    const ok    = t.status === 'executed';
+    return `<div class="flex items-center justify-between py-2 border-b border-slate-50 text-xs">
       <div class="flex items-center gap-2">
-        <span class="${color} font-bold">${icon} ${t.action.toUpperCase()}</span>
-        <span class="text-white font-bold">${t.ticker}</span>
-        <span class="text-gray-500">${t.quantity} shares</span>
+        <span class="font-bold ${isBuy?'text-green-600':'text-red-500'}">${isBuy?'▲':'▼'} ${t.action?.toUpperCase()}</span>
+        <span class="ticker-tag text-xs">${t.ticker}</span>
+        <span class="text-slate-500">${t.quantity} shares</span>
       </div>
-      <div class="flex items-center gap-3 text-right">
-        <span class="text-gray-300">$${(t.price||0).toFixed(2)}</span>
-        <span class="${statusColor}">${t.status}</span>
-        <span class="text-gray-600">${fmtTime(t.ts)}</span>
+      <div class="flex items-center gap-3">
+        <span class="text-slate-700 font-medium">$${(t.price||0).toFixed(2)}</span>
+        <span class="${ok?'text-green-600':'text-orange-500'} font-medium">${ok?'✓ Filled':'⚠ '+t.status}</span>
+        <span class="text-slate-400">${fmtTime(t.ts)}</span>
       </div>
     </div>`;
   }).join('');
 }
 
-function renderDecisions(decisions) {
-  const el = document.getElementById('last-decision');
-  if (!decisions.length) {
-    el.innerHTML = '<div class="text-xs text-gray-600 text-center py-4">Awaiting first analysis...</div>';
-    return;
-  }
-  const d = decisions[0];
-  const actionCls = d.action === 'buy' ? 'badge-buy' : d.action === 'sell' ? 'badge-sell' : 'badge-hold';
-  el.innerHTML = `
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="text-white font-bold text-lg">${d.ticker}</span>
-        <span class="${actionCls} text-xs font-bold px-2 py-0.5 rounded uppercase">${d.action}</span>
-      </div>
-      <div class="flex gap-2 text-xs">
-        <span class="text-gray-500">Conviction:</span>
-        <span class="${d.conviction==='high'?'text-green-400':d.conviction==='medium'?'text-yellow-400':'text-gray-400'}">${d.conviction}</span>
-        <span class="text-gray-600 ml-2">${fmtTime(d.ts)}</span>
-      </div>
-      <p class="text-xs text-gray-400 leading-relaxed border-l-2 border-purple-800 pl-2 mt-1">${(d.reasoning||'').slice(0,280)}${(d.reasoning||'').length>280?'…':''}</p>
-    </div>
-    ${decisions.slice(1,4).map(prev => `
-      <div class="mt-2 pt-2 border-t border-gray-900 flex items-center justify-between text-xs text-gray-600">
-        <span>${prev.ticker}</span>
-        <span class="${prev.action==='buy'?'text-green-600':prev.action==='sell'?'text-red-600':'text-gray-600'}">${prev.action.toUpperCase()}</span>
-        <span>${fmtTime(prev.ts)}</span>
-      </div>`).join('')}
-  `;
+// ── Log feed ──────────────────────────────────────────────────────────────────
+const LOG_META = {
+  cycle_start:    { icon: '🔄', label: 'Cycle Start',   color: 'text-blue-600' },
+  cycle_end:      { icon: '✅', label: 'Cycle Done',    color: 'text-green-600' },
+  scan:           { icon: '📡', label: 'Scanner',       color: 'text-purple-600' },
+  analysis:       { icon: '🧠', label: 'Decision',      color: 'text-blue-700' },
+  trade:          { icon: '💱', label: 'Trade',         color: 'text-green-600' },
+  stop_loss:      { icon: '🛑', label: 'Stop Loss',     color: 'text-red-600' },
+  error:          { icon: '❌', label: 'Error',         color: 'text-red-500' },
+  agent_market:   { icon: '📊', label: 'Market Analyst','color': 'text-blue-600' },
+  agent_sentiment:{ icon: '💬', label: 'Social Analyst','color': 'text-purple-600' },
+  agent_news:     { icon: '📰', label: 'News Analyst',  'color': 'text-amber-600' },
+  agent_fundamentals:{ icon:'📋', label:'Fundamentals', 'color':'text-emerald-600' },
+  agent_bull:     { icon: '🐂', label: 'Bull',          color: 'text-green-600' },
+  agent_bear:     { icon: '🐻', label: 'Bear',          color: 'text-red-600' },
+  agent_trader:   { icon: '💼', label: 'Trader',        color: 'text-indigo-600' },
+  agent_final:    { icon: '🎯', label: 'Final Decision', color: 'text-blue-700' },
+};
+
+function logText(e) {
+  if (e.type === 'trade') return `${e.action?.toUpperCase()} ${e.quantity} ${e.ticker} @ $${(e.price||0).toFixed(2)} — ${e.status}`;
+  if (e.type === 'analysis') return `${e.ticker} → ${e.action?.toUpperCase()} [${e.conviction}]`;
+  if (e.type === 'scan') return `Top: ${(e.top||[]).join(', ')}`;
+  if (e.type === 'cycle_start') return `Tickers: ${(e.tickers||[]).join(', ')}`;
+  if (e.type === 'stop_loss') return `${e.ticker} hit -${((e.pnl_pct||0)*100).toFixed(1)}%`;
+  if (e.type === 'error') return `${e.context}: ${e.error}`;
+  if (e.type === 'agent_market') return trim(e.report, 80);
+  if (e.type === 'agent_sentiment') return trim(e.report, 80);
+  if (e.type === 'agent_news') return trim(e.report, 80);
+  if (e.type === 'agent_fundamentals') return trim(e.report, 80);
+  if (e.type === 'agent_bull') return trim(e.argument, 80);
+  if (e.type === 'agent_bear') return trim(e.argument, 80);
+  if (e.type === 'agent_trader') return trim(e.plan, 80);
+  if (e.type === 'agent_final') return trim(e.decision, 80);
+  return '';
 }
 
 function renderLogs(logs) {
   const el = document.getElementById('log-feed');
-  const liveDot = document.getElementById('live-dot');
-
-  const recent = logs.slice(-30).reverse();
+  const recent = [...logs].reverse().slice(0, 40);
   if (!recent.length) {
-    el.innerHTML = '<div class="text-gray-600 text-center py-4">Waiting for agent activity...</div>';
-    liveDot.className = 'w-2 h-2 rounded-full bg-gray-600';
+    el.innerHTML = '<div class="text-slate-400 text-center py-4">Waiting for agent activity…</div>';
     return;
   }
-
-  liveDot.className = 'w-2 h-2 rounded-full bg-green-400 pulse';
-
   el.innerHTML = recent.map(e => {
-    const label = logTypeLabel(e.type);
-    const text  = logLineText(e);
-    const cls   = logLineClass(e.type, e);
-    return `
-    <div class="${cls}">
-      <span class="text-gray-600">${fmtTime(e.ts)}</span>
-      <span class="text-gray-500 ml-1">${label}</span>
-      ${text ? `<span class="text-gray-300 ml-1">${text}</span>` : ''}
+    const meta = LOG_META[e.type] || { icon: '•', label: e.type, color: 'text-slate-500' };
+    const text = logText(e);
+    return `<div class="flex items-start gap-2 py-1.5 border-b border-slate-50">
+      <span class="text-slate-400 text-xs w-14 shrink-0 pt-0.5">${fmtTime(e.ts)}</span>
+      <span>${meta.icon}</span>
+      <div class="flex-1 min-w-0">
+        <span class="font-semibold ${meta.color}">${meta.label}</span>
+        ${text ? `<span class="text-slate-500 ml-1">${text}</span>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
 
-// ── Main fetch + render loop ──────────────────────────────────────────────────
+// ── Main refresh ──────────────────────────────────────────────────────────────
 async function refresh() {
   try {
     const res = await fetch('/api/full');
@@ -425,19 +761,16 @@ async function refresh() {
     renderPositions(d.positions);
     renderPnl(d.pnl);
     renderTrades(d.trades);
-    renderDecisions(d.decisions);
     renderLogs(d.logs);
+    renderPipeline(d.pipeline);
 
-    document.getElementById('last-updated').textContent =
-      'Last updated: ' + new Date().toLocaleTimeString();
-  } catch(err) {
-    console.error('Refresh error:', err);
+    document.getElementById('last-updated').textContent = 'Updated ' + fmtTime(new Date().toISOString());
+  } catch(e) {
     document.getElementById('status-text').textContent = 'Server offline';
     document.getElementById('status-dot').className = 'w-3 h-3 rounded-full bg-red-500';
   }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initChart();
   refresh();

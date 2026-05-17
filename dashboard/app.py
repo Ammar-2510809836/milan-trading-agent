@@ -18,7 +18,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from bridge.trade_logger import read_recent
+from bridge.trade_logger import read_recent, read_latest_pipeline
 from bridge.kraken_executor import get_balance, get_open_orders, get_ticker_price, PAPER_MODE, XSTOCK_PAIRS
 
 POSITIONS_FILE = os.path.join(_project_root, "positions.json")
@@ -161,6 +161,11 @@ async def decisions(n: int = 20):
     return [e for e in logs if e["type"] == "analysis"][:n]
 
 
+@app.get("/api/pipeline")
+async def pipeline(ticker: str = None):
+    return read_latest_pipeline(ticker)
+
+
 @app.get("/api/full")
 async def full():
     """Single endpoint the dashboard polls — everything in one shot."""
@@ -178,6 +183,7 @@ async def full():
         "trades": [e for e in logs if e["type"] == "trade"][:20],
         "decisions": [e for e in logs if e["type"] == "analysis"][:10],
         "logs": recent_logs,
+        "pipeline": read_latest_pipeline(),
     }
 
 

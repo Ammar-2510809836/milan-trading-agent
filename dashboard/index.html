@@ -17,7 +17,8 @@
     /* Agent node styles */
     .agent-node { border-radius: 10px; border: 1.5px solid; padding: 10px 12px; transition: all 0.3s; }
     .agent-node.pending  { background: #f8fafc; border-color: #cbd5e1; opacity: 0.6; }
-    .agent-node.running  { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .agent-node.running  { border-color: #3b82f6; background: #eff6ff; animation: nodeRunning 1.4s ease-in-out infinite; }
+    @keyframes nodeRunning { 0%,100%{box-shadow:0 0 0 3px rgba(59,130,246,0.15)} 50%{box-shadow:0 0 0 7px rgba(59,130,246,0.28)} }
     .agent-node.complete { background: white; border-color: #94a3b8; }
     .agent-node.complete.positive { border-color: #22c55e; background: #f0fdf4; }
     .agent-node.complete.negative { border-color: #ef4444; background: #fef2f2; }
@@ -508,8 +509,15 @@ function setNode(id, state, text, cls = '') {
   if (report && text) report.textContent = trim(text);
 }
 
-function renderPipeline(p) {
-  if (!p || !p.cycle_ts) return;
+function renderPipeline(p, isRunning) {
+  const PIPELINE_ORDER = ['market','sentiment','news','fundamentals','bull','bear','invest-plan','trader','risk-agg','risk-neu','risk-con','manager','execution'];
+
+  if (!p || !p.cycle_ts) {
+    if (isRunning) {
+      setNode('market', 'running', 'Fetching market data…');
+    }
+    return;
+  }
 
   const ticker = p.ticker || '—';
   document.getElementById('pipeline-ticker').textContent = ticker;
@@ -578,6 +586,31 @@ function renderPipeline(p) {
       `${t.action?.toUpperCase()} ${t.quantity} ${t.ticker} @ $${(t.price||0).toFixed(2)}`;
     document.getElementById('exec-status').innerHTML =
       `<span class="badge ${isExec ? 'badge-buy' : 'badge-hold'}">${isExec ? '✓ Executed' : '⚠ ' + t.status}</span>`;
+  }
+
+  // Animate the next pending node as "running" when cycle is active
+  if (isRunning) {
+    const completedSet = new Set([
+      p.agent_market       ? 'market'       : null,
+      p.agent_sentiment    ? 'sentiment'     : null,
+      p.agent_news         ? 'news'          : null,
+      p.agent_fundamentals ? 'fundamentals'  : null,
+      p.agent_bull         ? 'bull'          : null,
+      p.agent_bear         ? 'bear'          : null,
+      p.agent_investment_plan ? 'invest-plan': null,
+      p.agent_trader       ? 'trader'        : null,
+      p.agent_risk_aggressive ? 'risk-agg'   : null,
+      p.agent_risk_neutral    ? 'risk-neu'   : null,
+      p.agent_risk_conservative ? 'risk-con' : null,
+      p.agent_final        ? 'manager'       : null,
+      p.trade              ? 'execution'     : null,
+    ]);
+    for (const id of PIPELINE_ORDER) {
+      if (!completedSet.has(id)) {
+        setNode(id, 'running', 'Processing…');
+        break;
+      }
+    }
   }
 }
 
@@ -762,7 +795,7 @@ async function refresh() {
     renderPnl(d.pnl);
     renderTrades(d.trades);
     renderLogs(d.logs);
-    renderPipeline(d.pipeline);
+    renderPipeline(d.pipeline, d.status?.running);
 
     document.getElementById('last-updated').textContent = 'Updated ' + fmtTime(new Date().toISOString());
   } catch(e) {

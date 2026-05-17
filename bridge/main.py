@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--ticker", type=str, help="Analyze a single ticker (implies --once)")
     parser.add_argument("--paper", action="store_true", default=True, help="Paper trading mode (default)")
     parser.add_argument("--live", action="store_true", help="Live trading mode (real money)")
+    parser.add_argument("--dry-run", action="store_true", help="Run analysis only (no trades executed)")
+    parser.add_argument("--fast", action="store_true", help="Fast mode (market-only analysts)")
     parser.add_argument("--balance", action="store_true", help="Print current balance and exit")
     parser.add_argument("--scan", action="store_true", help="Run market scanner and exit")
     args = parser.parse_args()
@@ -47,9 +49,9 @@ def main():
     from bridge.scheduler import run_once, run_scheduler
 
     if args.once or args.ticker:
-        run_once(args.ticker)
+        run_once(args.ticker, execute_trades=not args.dry_run, fast=args.fast)
     else:
-        run_scheduler()
+        run_scheduler(execute_trades=not args.dry_run, fast=args.fast)
 
 
 if __name__ == "__main__":

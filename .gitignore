@@ -12,3 +12,5 @@ TradingAgents/
 kraken-cli/
 .claude/
 positions.json
+trade_log.jsonl
+*.jsonl

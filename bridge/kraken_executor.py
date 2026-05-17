@@ -86,19 +86,17 @@ def execute_trade(decision: dict) -> dict:
     pair = f"{xstock}/USD"
 
     if PAPER_MODE:
+        # kraken-cli v0.3.x: `paper buy/sell` currently supports only <PAIR> <VOLUME>
+        # (no --asset-class / --type flags). Keep it minimal for compatibility.
         cmd = [
             "kraken", "paper", action,
             pair, str(quantity),
-            "--asset-class", "tokenized_asset",
-            "--type", "market",
             "-o", "json",
         ]
     else:
         cmd = [
             "kraken", "order", action,
             pair, str(quantity),
-            "--asset-class", "tokenized_asset",
-            "--type", "market",
             "-o", "json",
         ]
         if leverage > 1:

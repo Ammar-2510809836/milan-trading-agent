@@ -26,12 +26,15 @@ from bridge.portfolio_manager import (
     get_ticker_price,
 )
 from bridge.market_scanner import scan
+from bridge.trade_logger import (
+    log_cycle_start, log_cycle_end, log_analysis,
+    log_trade, log_error, log_stop_loss,
+)
 
-CYCLE_INTERVAL_HOURS = 1   # run every hour for maximum trading opportunities
+CYCLE_INTERVAL_HOURS = 1
 
 
 def _map_conviction(decision: dict) -> str:
-    """Infer conviction level from TradingAgents decision fields."""
     reasoning = decision.get("reasoning", "").lower()
     action = decision.get("action", "hold").lower()
     if action == "hold":
@@ -47,20 +50,19 @@ def run_trading_cycle(tickers: list[str] | None = None):
     print(f"[AGENT] Cycle started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}")
 
-    # Step 1: enforce stop-losses before opening new positions
     enforce_stop_losses()
 
-    # Step 2: pick highest-opportunity tickers
     focus = tickers if tickers else scan(top_n=3)
+    log_cycle_start(focus)
 
-    # Step 3: print current balance
     print("[AGENT] Balance:", get_balance())
 
-    # Step 4: run TradingAgents analysis
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
     except ImportError:
-        print("[AGENT] ERROR: TradingAgents not installed. Run: cd TradingAgents && pip install .")
+        msg = "TradingAgents not installed. Run: cd TradingAgents && pip install ."
+        print(f"[AGENT] ERROR: {msg}")
+        log_error("import", msg)
         return
 
     config = TRADING_AGENTS_CONFIG.copy()
@@ -76,17 +78,19 @@ def run_trading_cycle(tickers: list[str] | None = None):
             print(f"\n[AGENT] Analyzing {ticker}...")
             _state, decision = ta.propagate(ticker, today)
             action = decision.get("action", "hold").lower()
-            print(f"[AGENT] Decision: {action.upper()} {ticker} | {decision.get('reasoning', '')[:120]}")
+            reasoning = decision.get("reasoning", "")
+            conviction = _map_conviction(decision)
+
+            print(f"[AGENT] Decision: {action.upper()} {ticker} | {reasoning[:120]}")
+            log_analysis(ticker, action, conviction, reasoning)
 
             if action == "hold":
                 continue
 
-            # Don't double-open an existing long position
             if action == "buy" and has_open_position(ticker):
                 print(f"[AGENT] Already holding {ticker} — skipping buy.")
                 continue
 
-            # Get portfolio value for sizing (use USD balance)
             balance = get_balance()
             try:
                 portfolio_usd = float(
@@ -95,7 +99,6 @@ def run_trading_cycle(tickers: list[str] | None = None):
             except Exception:
                 portfolio_usd = 10000.0
 
-            conviction = _map_conviction(decision)
             quantity, leverage = get_position_size(ticker, portfolio_usd, conviction)
 
             if quantity <= 0:
@@ -107,23 +110,29 @@ def run_trading_cycle(tickers: list[str] | None = None):
                 "ticker": ticker,
                 "quantity": quantity,
                 "leverage": leverage,
-                "reasoning": decision.get("reasoning", ""),
+                "reasoning": reasoning,
             })
 
+            price = get_ticker_price(ticker) or 0.0
+
             if result.get("status") == "executed":
-                price = get_ticker_price(ticker) or 0.0
                 if action == "buy":
                     record_entry(ticker, quantity, price, action)
                 else:
                     record_exit(ticker)
+                log_trade(ticker, action, quantity, price, leverage, "executed")
                 print(f"[AGENT] {action.upper()} {quantity} {ticker} @ ~${price:.2f} (leverage={leverage}x)")
             else:
+                log_trade(ticker, action, quantity, price, leverage, "failed",
+                          str(result.get("error", "")))
                 print(f"[AGENT] Trade not executed: {result}")
 
         except Exception as e:
             print(f"[AGENT] ERROR on {ticker}: {e}")
+            log_error(ticker, str(e))
             continue
 
+    log_cycle_end()
     print(f"[AGENT] Cycle complete at {datetime.now().strftime('%H:%M:%S')}")
 
 

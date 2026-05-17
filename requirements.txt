@@ -3,3 +3,5 @@ schedule
 requests
 pandas
 google-generativeai
+fastapi
+uvicorn[standard]

@@ -1,0 +1,144 @@
+"""
+Autonomous trading loop.
+
+Every cycle:
+  1. Enforce stop-losses on open positions
+  2. Scan market for top-opportunity tickers
+  3. Run TradingAgents multi-agent analysis (Gemini 2.5 Pro/Flash)
+  4. Size position and execute via Kraken CLI
+"""
+
+import sys
+import os
+import schedule
+import time
+from datetime import datetime
+
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _project_root)
+sys.path.insert(0, os.path.join(_project_root, "TradingAgents"))
+
+from bridge.gemini_config import TRADING_AGENTS_CONFIG
+from bridge.kraken_executor import execute_trade, get_balance
+from bridge.portfolio_manager import (
+    get_position_size, record_entry, record_exit,
+    enforce_stop_losses, is_at_capacity, has_open_position,
+    get_ticker_price,
+)
+from bridge.market_scanner import scan
+
+CYCLE_INTERVAL_HOURS = 1   # run every hour for maximum trading opportunities
+
+
+def _map_conviction(decision: dict) -> str:
+    """Infer conviction level from TradingAgents decision fields."""
+    reasoning = decision.get("reasoning", "").lower()
+    action = decision.get("action", "hold").lower()
+    if action == "hold":
+        return "low"
+    strong_keywords = ["strong", "very bullish", "very bearish", "high confidence", "clear signal"]
+    if any(kw in reasoning for kw in strong_keywords):
+        return "high"
+    return "medium"
+
+
+def run_trading_cycle(tickers: list[str] | None = None):
+    print(f"\n{'='*60}")
+    print(f"[AGENT] Cycle started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}")
+
+    # Step 1: enforce stop-losses before opening new positions
+    enforce_stop_losses()
+
+    # Step 2: pick highest-opportunity tickers
+    focus = tickers if tickers else scan(top_n=3)
+
+    # Step 3: print current balance
+    print("[AGENT] Balance:", get_balance())
+
+    # Step 4: run TradingAgents analysis
+    try:
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+    except ImportError:
+        print("[AGENT] ERROR: TradingAgents not installed. Run: cd TradingAgents && pip install .")
+        return
+
+    config = TRADING_AGENTS_CONFIG.copy()
+    ta = TradingAgentsGraph(debug=False, config=config)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    for ticker in focus:
+        try:
+            if is_at_capacity():
+                print(f"[AGENT] Portfolio at max capacity — skipping {ticker}")
+                break
+
+            print(f"\n[AGENT] Analyzing {ticker}...")
+            _state, decision = ta.propagate(ticker, today)
+            action = decision.get("action", "hold").lower()
+            print(f"[AGENT] Decision: {action.upper()} {ticker} | {decision.get('reasoning', '')[:120]}")
+
+            if action == "hold":
+                continue
+
+            # Don't double-open an existing long position
+            if action == "buy" and has_open_position(ticker):
+                print(f"[AGENT] Already holding {ticker} — skipping buy.")
+                continue
+
+            # Get portfolio value for sizing (use USD balance)
+            balance = get_balance()
+            try:
+                portfolio_usd = float(
+                    balance.get("USD", balance.get("balance", {}).get("USD", 10000))
+                )
+            except Exception:
+                portfolio_usd = 10000.0
+
+            conviction = _map_conviction(decision)
+            quantity, leverage = get_position_size(ticker, portfolio_usd, conviction)
+
+            if quantity <= 0:
+                print(f"[AGENT] Could not size position for {ticker} — skipping.")
+                continue
+
+            result = execute_trade({
+                "action": action,
+                "ticker": ticker,
+                "quantity": quantity,
+                "leverage": leverage,
+                "reasoning": decision.get("reasoning", ""),
+            })
+
+            if result.get("status") == "executed":
+                price = get_ticker_price(ticker) or 0.0
+                if action == "buy":
+                    record_entry(ticker, quantity, price, action)
+                else:
+                    record_exit(ticker)
+                print(f"[AGENT] {action.upper()} {quantity} {ticker} @ ~${price:.2f} (leverage={leverage}x)")
+            else:
+                print(f"[AGENT] Trade not executed: {result}")
+
+        except Exception as e:
+            print(f"[AGENT] ERROR on {ticker}: {e}")
+            continue
+
+    print(f"[AGENT] Cycle complete at {datetime.now().strftime('%H:%M:%S')}")
+
+
+def run_once(ticker: str | None = None):
+    tickers = [ticker] if ticker else None
+    run_trading_cycle(tickers)
+
+
+def run_scheduler():
+    print("[SCHEDULER] Autonomous trading agent starting...")
+    run_trading_cycle()
+
+    schedule.every(CYCLE_INTERVAL_HOURS).hours.do(run_trading_cycle)
+    print(f"[SCHEDULER] Running every {CYCLE_INTERVAL_HOURS}h. Ctrl+C to stop.")
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)

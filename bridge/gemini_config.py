@@ -15,7 +15,8 @@ if NVIDIA_API_KEY:
     # NVIDIA NIM — OpenAI-compatible endpoint (Chat Completions, not Responses API).
     # Use provider="deepseek" so TradingAgents routes through /v1/chat/completions
     # instead of OpenAI's /v1/responses which NVIDIA does not support.
-    os.environ["OPENAI_API_KEY"] = NVIDIA_API_KEY
+    os.environ["OPENAI_API_KEY"]  = NVIDIA_API_KEY
+    os.environ["DEEPSEEK_API_KEY"] = NVIDIA_API_KEY
 
     TRADING_AGENTS_CONFIG = DEFAULT_CONFIG.copy()
     TRADING_AGENTS_CONFIG.update({
@@ -24,7 +25,7 @@ if NVIDIA_API_KEY:
         "deep_think_llm":  "nvidia/nemotron-3-super-120b-a12b",   # backup: z-ai/glm-5.1
         "quick_think_llm": "qwen/qwen3.5-122b-a10b",              # backup: deepseek-ai/deepseek-v4-flash
         "max_debate_rounds": 1,
-        "online_tools": True,
+        "online_tools": False,
     })
     print("[CONFIG] Using NVIDIA NIM (deepseek provider → chat/completions)")
     print("[CONFIG]   deep_think  → nvidia/nemotron-3-super-120b-a12b")
